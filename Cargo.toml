@@ -2,8 +2,18 @@ package={ edition='2024', name='lidar' }
 
 [dependencies]
 vector={ git='https://github.com/Matthias-Fauconneau/vector' }
+ui={ git='https://github.com/Matthias-Fauconneau/ui' }
 las={version='*', features = ['laz']}
 bytemuck='*'
 fehler='*'
 memmap={version='*', package='memmap2'}
 owning-ref={package='owning_ref', version = "*"}
+vulkano={ git='https://github.com/vulkano-rs/vulkano', default-features=false, features=['macros'] }
+vulkano-spirv={ git='https://github.com/Matthias-Fauconneau/vulkano-spirv' }
+
+[build-dependencies]
+naga={ version='*', features = ['wgsl-in','spv-out'] }
+bytemuck='*'
+
+[patch.'https://github.com/Matthias-Fauconneau/ui'] # topology
+ui={path='../ui'}
