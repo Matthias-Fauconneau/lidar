@@ -1,0 +1,9 @@
+package={ edition='2024', name='lidar' }
+
+[dependencies]
+vector={ git='https://github.com/Matthias-Fauconneau/vector' }
+las={version='*', features = ['laz']}
+bytemuck='*'
+fehler='*'
+memmap={version='*', package='memmap2'}
+owning-ref={package='owning_ref', version = "*"}
