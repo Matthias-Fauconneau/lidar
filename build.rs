@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		let ref out_dir = std::env::var("OUT_DIR")?;
 		let ref spv = format!("{name}.spv");
 		use naga::back::spv::*;
-		std::fs::write(&format!("{out_dir}/{spv}"), bytemuck::cast_slice(&write_vec(module, &naga::valid::Validator::new(default(), default()).validate(module)?, &Options{flags: Options::default().flags|WriterFlags::DEBUG, ..default()}, None)?))?;
+		std::fs::write(&format!("{out_dir}/{spv}"), bytemuck::cast_slice(&write_vec(module, &naga::valid::Validator::new(default(), default()).validate(module)?, &Options{flags: Options::default().flags|WriterFlags::DEBUG|WriterFlags::FORCE_POINT_SIZE, ..default()}, None)?))?;
 		let ref o = format!("{spv}.o");
 		assert!(std::process::Command::new("objcopy").current_dir(out_dir).args(["-I","binary","-O","default","--set-section-alignment",".data=4", spv, o]).spawn().unwrap().wait().unwrap().success());
 		println!("cargo:rustc-link-arg={out_dir}/{o}");

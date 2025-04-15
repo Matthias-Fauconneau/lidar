@@ -21,7 +21,7 @@ struct App {
 
 impl App {
 fn new(context: &Context, commands: &mut Commands) -> Result<Self> {
-	let name = "2684500_1248500";
+	let name = "2684000_1248500";
 	let ref cache = format!("{}/.cache/lidar/{name}", std::env::var("HOME")?);
 	if !std::fs::exists(cache)? {
 		let mut reader = las::Reader::from_path(format!("{}/{name}.laz", std::env::var("HOME")?))?;
@@ -34,9 +34,9 @@ fn new(context: &Context, commands: &mut Commands) -> Result<Self> {
 	    
 		for point in reader.points() {
 			let las::Point{x: E,y: N, z, ..} = point.unwrap();
-			let x = (E-center.x)/extent;
-	        let y = (N-center.y)/extent;
-	        let z = (z-center.z)/extent;
+			let x = 2.*(E-center.x)/extent;
+	        let y = 2.*(N-center.y)/extent;
+	        let z = 2.*(z-center.z)/extent;
 			//if x > -1./2. && x < 1./2. && y > -1./2. && y < 1./2. {
 			points.push(xyz{x,y,z}.into());
 		}
@@ -61,8 +61,8 @@ fn paint(&mut self, context@Context{memory_allocator, ..}: &Context, commands: &
 	let xy{x: y, y: z} = rotate(-std::f32::consts::PI/3., xy{x: y, y: z});
 	let z = (z-1.)/2.;
 	let n = 1./4.;
-	let f = 1.;
-	if true { xyzw{x, y: aspect_ratio*y, z: -z, w: 1.}  } else {
+	let f = 2.;
+	if false { xyzw{x, y: aspect_ratio*y, z: -z, w: 1.}  } else {
 	let zz = -f/(f-n);
 	let z1 = -(f*n)/(f-n);
 	xyzw{x, y: aspect_ratio*y, z: zz*z+z1, w: -z}
@@ -84,10 +84,10 @@ fn paint(&mut self, context@Context{memory_allocator, ..}: &Context, commands: &
 	
 	terrain.render(context, commands, target.clone(), depth.clone(), view_projection)?;
 	
-	// *yaw += std::f32::consts::PI/6./60.;
+	*yaw += std::f32::consts::PI/6./60.;
 	Ok(())
 }
-//fn event(&mut self, _size: size, _context: &mut ui::EventContext, _event: &ui::Event) -> Result<bool> { Ok(false/*true*//*Keep repainting*/) }
+fn event(&mut self, _context: &Context, _commands: &mut Commands, _size: size, _event_context: &mut ui::EventContext, _event: &ui::Event) -> Result<bool> { Ok(true/*Keep repainting*/) }
 }
 
 fn main() -> Result { ui::run("lidar", Box::new(move |context, commands| Ok(Box::new(App::new(context, commands)?)))) }

@@ -22,7 +22,7 @@ impl Terrain {
 			view_projection: view_projection.map(|column| column.into()).into(), 
 		}, &[])?;
 		commands.bind_vertex_buffers(0, vertices.clone())?;
-		unsafe{commands.draw(vertices.len() as _, 0, 0, 0)}?;
+		unsafe{commands.draw(vertices.len() as _, 1, 0, 0)}?;
 		commands.end_rendering()?;
 		Ok(())
 	}

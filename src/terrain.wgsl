@@ -15,5 +15,5 @@ struct VertexOutput {
 }
 
 @fragment fn fragment(vertex: VertexOutput) -> @location(0) vec4<f32> {
-	return vertex.position;
+	return vec4(1.,1.,1.,1.);
 }

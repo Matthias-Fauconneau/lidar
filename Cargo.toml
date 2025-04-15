@@ -17,3 +17,6 @@ bytemuck='*'
 
 [patch.'https://github.com/Matthias-Fauconneau/ui'] # topology
 ui={path='../ui'}
+
+[patch.'https://github.com/vulkano-rs/vulkano'] # debug
+vulkano={path='../vulkano/vulkano'}
