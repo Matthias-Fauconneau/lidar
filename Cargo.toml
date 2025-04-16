@@ -10,6 +10,8 @@ memmap={version='*', package='memmap2'}
 owning-ref={package='owning_ref', version = "*"}
 vulkano={ git='https://github.com/vulkano-rs/vulkano', default-features=false, features=['macros'] }
 vulkano-spirv={ git='https://github.com/Matthias-Fauconneau/vulkano-spirv' }
+image={git='https://github.com/Matthias-Fauconneau/image', features=['io']}
+tiff='*'
 
 [build-dependencies]
 naga={ version='*', features = ['wgsl-in','spv-out'] }
@@ -20,3 +22,10 @@ ui={path='../ui'}
 
 [patch.'https://github.com/vulkano-rs/vulkano'] # debug
 vulkano={path='../vulkano/vulkano'}
+
+[patch.'https://github.com/Matthias-Fauconneau/image'] # tiff
+image={path='../image'}
+
+[patch.crates-io] # tiff
+tiff={path='../tiff'}
+image={path='../image-rs'}
