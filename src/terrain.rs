@@ -23,9 +23,9 @@ impl Terrain {
 		pass.begin_rendering(context, commands, color, Some(depth), true, &terrain::Uniforms{
 			view_projection: view_projection.map(|column| column.into()).into(), 
 		}, &[
-            WriteDescriptorSet::image_view(1, ImageView::new_default(image.clone())?),
-            WriteDescriptorSet::sampler(2, linear(context)),
-        ])?;
+			WriteDescriptorSet::image_view(1, ImageView::new_default(image.clone())?),
+			WriteDescriptorSet::sampler(2, linear(context)),
+		])?;
 		commands.bind_vertex_buffers(0, vertices.clone())?;
 		unsafe{commands.draw(vertices.len() as _, 1, 0, 0)}?;
 		commands.end_rendering()?;

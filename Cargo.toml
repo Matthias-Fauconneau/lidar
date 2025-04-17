@@ -12,6 +12,7 @@ vulkano={ git='https://github.com/vulkano-rs/vulkano', default-features=false, f
 vulkano-spirv={ git='https://github.com/Matthias-Fauconneau/vulkano-spirv' }
 image={git='https://github.com/Matthias-Fauconneau/image', features=['io']}
 tiff='*'
+jpeg={package='zune-jpeg', version='*'}
 
 [build-dependencies]
 naga={ version='*', features = ['wgsl-in','spv-out'] }
