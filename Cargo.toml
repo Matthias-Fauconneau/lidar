@@ -15,7 +15,8 @@ tiff='*'
 jpeg={package='zune-jpeg', version='*'}
 
 [build-dependencies]
-naga={ version='*', features = ['wgsl-in','spv-out'] }
+#naga={version='*', features = ['wgsl-in','spv-out'] }
+naga={path='../wgpu/naga', features = ['wgsl-in','spv-out'] }
 bytemuck='*'
 
 [patch.'https://github.com/Matthias-Fauconneau/ui'] # topology

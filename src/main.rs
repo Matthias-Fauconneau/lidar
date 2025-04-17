@@ -9,6 +9,7 @@ type Array<T=f32> = OwningRef<Box<memmap::Mmap>, [T]>;
 }
 
 mod terrain; use terrain::Terrain;
+mod buildings; use buildings::Buildings;
 mod points; use points::Points;
 
 use {vector::{xyz, MinMax, vec3, xy, size, int2, vec2, rotate, xyzw, vec4, mat4}, image::{Image, rgb8, rgba8}};
@@ -16,6 +17,7 @@ use ui::vulkan::{Context, Commands, Arc, ImageView, Image as GPUImage, default, 
 
 struct App {
 	terrain: Terrain,
+	buildings: Buildings,
 	points: Points,
 	view_position: vec2,
 	yaw: f32,
@@ -23,6 +25,10 @@ struct App {
 
 impl App {
 	fn new(context: &Context, commands: &mut Commands) -> Result<Self> {
+		let ref cache = format!("{}/.cache/lidar/buildings", std::env::var("HOME")?);
+		assert!(std::fs::exists(cache)?); // -> ./gdb.rs
+		let ref quads = map::<vec3>(cache)?;
+
 		let name = "2684000_1248500";
 		let ref cache = format!("{}/.cache/lidar/{name}.z", std::env::var("HOME")?);
 		if !std::fs::exists(cache)? {
@@ -41,8 +47,9 @@ impl App {
 		let ground = map::<f32>(cache)?;
 		let ground = Image::new(2000.into(), ground);
 		let meters_per_pixel = 1000./ground.size.x as f32;
-		
+
 		let ref cache = format!("{}/.cache/lidar/{name}", std::env::var("HOME")?);
+		let (center, extent) = (xy{x: 2684250., y: 1248750.}, 500.);
 		if !std::fs::exists(cache)? {
 			let mut reader = las::Reader::from_path(format!("{}/{name}.laz", std::env::var("HOME")?))?;
 			let mut points = Vec::with_capacity(reader.header().number_of_points() as usize);
@@ -51,12 +58,11 @@ impl App {
 			let center = (1./2.)*(min+max);
 			let extent = max-min;
 			let extent = extent.x.min(extent.y);
+			//println!("{center:?} {extent:?}");
 
 			for point in reader.points() {
-				let las::Point{x: E,y: N, z, ..} = point.unwrap();
-				let x = 2.*(E-center.x)/extent;
-				let y = 2.*(N-center.y)/extent;
-				//let z = 2.*(z-center.z)/extent;
+				let las::Point{x,y, z, ..} = point.unwrap();
+				let xy{x,y} = 2.*(xy{x,y}-center.xy())/extent;
 				points.push(xyz{x,y,z}.into());
 			}
 			std::fs::write(cache, bytemuck::cast_slice::<vec3,_>(&points))?;
@@ -123,18 +129,19 @@ impl App {
 			[min, max]
 		}
 		let [min_height, _max] = minmax(&ground.data);
-		let z = |height| meters_to_normalized*(height-min_height);
+		let map_z = |height| meters_to_normalized*(height-min_height);
 		
 		Ok(Self{
-			terrain: Terrain::new(context, commands, &ground, meters_per_pixel, z, color.clone())?,
-			points: Points::new(context, commands, points, z, color)?,
+			terrain: Terrain::new(context, commands, &ground, meters_per_pixel, map_z, color.clone())?,
+			buildings: Buildings::new(context, commands, quads, |xyz{x,y,z}| { let xy{x,y} = 2.*(xy{x,y}-center)/extent; xyz{x,y,z: map_z(z)}}, color.clone())?,
+			points: Points::new(context, commands, points, map_z, color)?,
 			view_position: xy{x: 0., y: 0.}, yaw: 0.
 		})
 	}}
 
 impl ui::Widget for App {
 	fn paint(&mut self, context@Context{memory_allocator, ..}: &Context, commands: &mut Commands, target: Arc<ImageView>, _: size, _: int2) -> Result<()> {
-		let Self{terrain, points, view_position, yaw} = self;
+		let Self{terrain, buildings, points, view_position, yaw} = self;
 		let image_size = {let [x,y,_] = target.image().extent(); xy{x,y}};
 		let aspect_ratio = image_size.x as f32/image_size.y as f32;
 
@@ -144,7 +151,10 @@ impl ui::Widget for App {
 			let z = (z-1.)/2.;
 			let n = 1./4.;
 			let f = 2.;
-			if false { xyzw{x, y: aspect_ratio*y, z: -z, w: 1.}  } else {
+			if true {
+				let xy{x,y} = 2.*xy{x,y};
+				xyzw{x, y: aspect_ratio*y, z: -z, w: 1.}
+			} else {
 				let zz = -f/(f-n);
 				let z1 = -(f*n)/(f-n);
 				xyzw{x, y: aspect_ratio*y, z: zz*z+z1, w: -z}
@@ -165,6 +175,7 @@ impl ui::Widget for App {
 		}, default())?)?;
 
 		terrain.render(context, commands, target.clone(), depth.clone(), view_projection)?;
+		buildings.render(context, commands, target.clone(), depth.clone(), view_projection)?;
 		points.render(context, commands, target.clone(), depth.clone(), view_projection)?;
 
 		*yaw += std::f32::consts::PI/6./60.;
