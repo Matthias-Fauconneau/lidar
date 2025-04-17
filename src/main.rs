@@ -9,12 +9,14 @@ type Array<T=f32> = OwningRef<Box<memmap::Mmap>, [T]>;
 }
 
 mod terrain; use terrain::Terrain;
+mod points; use points::Points;
 
 use {vector::{xyz, MinMax, vec3, xy, size, int2, vec2, rotate, xyzw, vec4, mat4}, image::{Image, rgb8, rgba8}};
 use ui::vulkan::{Context, Commands, Arc, ImageView, Image as GPUImage, default, ImageCreateInfo, Format, ImageUsage, image};
 
 struct App {
 	terrain: Terrain,
+	points: Points,
 	view_position: vec2,
 	yaw: f32,
 }
@@ -48,14 +50,13 @@ impl App {
 			let MinMax{min, max} = MinMax{min: {let las::Vector{x,y,z}=min; xyz{x,y,z}}, max: {let las::Vector{x,y,z}=max; xyz{x,y,z}}};
 			let center = (1./2.)*(min+max);
 			let extent = max-min;
-			println!("{center:?} {extent:?}");
 			let extent = extent.x.min(extent.y);
 
 			for point in reader.points() {
 				let las::Point{x: E,y: N, z, ..} = point.unwrap();
 				let x = 2.*(E-center.x)/extent;
 				let y = 2.*(N-center.y)/extent;
-				let z = 2.*(z-center.z)/extent;
+				//let z = 2.*(z-center.z)/extent;
 				points.push(xyz{x,y,z}.into());
 			}
 			std::fs::write(cache, bytemuck::cast_slice::<vec3,_>(&points))?;
@@ -126,14 +127,14 @@ impl App {
 		
 		Ok(Self{
 			terrain: Terrain::new(context, commands, &ground, meters_per_pixel, z, color.clone())?,
-			//points: Points::new(context, commands, points, &color)?,
+			points: Points::new(context, commands, points, z, color)?,
 			view_position: xy{x: 0., y: 0.}, yaw: 0.
 		})
 	}}
 
 impl ui::Widget for App {
 	fn paint(&mut self, context@Context{memory_allocator, ..}: &Context, commands: &mut Commands, target: Arc<ImageView>, _: size, _: int2) -> Result<()> {
-		let Self{terrain, view_position, yaw} = self;
+		let Self{terrain, points, view_position, yaw} = self;
 		let image_size = {let [x,y,_] = target.image().extent(); xy{x,y}};
 		let aspect_ratio = image_size.x as f32/image_size.y as f32;
 
@@ -164,6 +165,7 @@ impl ui::Widget for App {
 		}, default())?)?;
 
 		terrain.render(context, commands, target.clone(), depth.clone(), view_projection)?;
+		points.render(context, commands, target.clone(), depth.clone(), view_projection)?;
 
 		*yaw += std::f32::consts::PI/6./60.;
 		Ok(())
