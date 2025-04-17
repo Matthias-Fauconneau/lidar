@@ -10,7 +10,7 @@ type Array<T=f32> = OwningRef<Box<memmap::Mmap>, [T]>;
 
 mod terrain; use terrain::Terrain;
 
-use {vector::{xyz, MinMax, vec3, xy, size, int2, vec2, rotate, xyzw, vec4, mat4}, image::{Image, rgb8}};
+use {vector::{xyz, MinMax, vec3, xy, size, int2, vec2, rotate, xyzw, vec4, mat4}, image::{Image, rgb, rgba, rgba8, rgb8}};
 use ui::vulkan::{Context, Commands, Arc, ImageView, Image as GPUImage, default, ImageCreateInfo, Format, ImageUsage};
 
 struct App {
@@ -45,31 +45,36 @@ fn new(context: &Context, commands: &mut Commands) -> Result<Self> {
 		println!("{cache}");
 	}
 	let ref points = map::<vec3>(cache)?;
-	//let [min, max] = [xy{x: 2684000, y: 1248500}, xy{ x: 2684500, y: 1249000}];
-	let [center, extent] = [xy{x: 2684250, y: 1248750}, xy{ x: 500, y: 500}];
+	let points_bounds = MinMax{min: xy{x: 2684000, y: 1248500}, max: xy{ x: 2684500, y: 1249000}};
+	println!("{points_bounds:?}");
+	//let [center, extent] = [xy{x: 2684250, y: 1248750}, xy{ x: 500, y: 500}];
 	
 	let name = "2408";
 	let ref cache = format!("{}/.cache/lidar/{name}", std::env::var("HOME")?);
 	if !std::fs::exists(cache)? {
 		let tiff = unsafe{memmap::Mmap::map(&std::fs::File::open(format!("{}/{name}.tif", std::env::var("HOME")?))?)?};
 	    let mut tiff = tiff::decoder::Decoder::new(std::io::Cursor::new(&*tiff))?;
-	    let (size_x, size_y) = tiff.dimensions()?;
-	    let size = size{x: size_x, y: size_y};
-		let [_, _, _, E, N, _] = tiff.get_tag_f64_vec(tiff::tags::Tag::ModelTiepointTag)?[..] else { panic!() };
-	    let [scale_E, scale_N, _] = tiff.get_tag_f64_vec(tiff::tags::Tag::ModelPixelScaleTag)?[..] else { panic!() };
-	    let min = xy{x: E, y: (N-scale_N*size.y as f64)};
-	    let max = xy{x: (E+scale_E*size.x as f64), y: N};
-	    println!("{min} {max}");
-		//println!("{:?}", tiff.image().chunk_offsets);
-		let image = Image::new(tiff.chunk_data_dimensions(0).into(), bytemuck::cast_vec(tiff.read_chunk(0)?));
-		//let image = load_rgb8(format!("{}/{name}.tif", std::env::var("HOME")?));
-		//println!("{}", image.size);
-		panic!();//image.slice(, 10000.into())
-		//std::fs::write(cache, bytemuck::cast_slice(image.data))?;
-		//println!("{cache}");
+	    let size = {let (x, y) = tiff.dimensions()?; xy{x, y}};
+		let min = {let [_, _, _, E, N, _] = tiff.get_tag_f64_vec(tiff::tags::Tag::ModelTiepointTag)?[..] else { panic!() }; xy{x: E as u32, y: N as u32}};
+		let scale = {let [scale_E, scale_N, _] = tiff.get_tag_f64_vec(tiff::tags::Tag::ModelPixelScaleTag)?[..] else { panic!() }; xy{x: (1./scale_E) as u32, y: (1./scale_N) as u32}};
+		let MinMax{min, max} = MinMax{min: (points_bounds.min-min)*scale+xy{x: 0, y: size.y}, max: (points_bounds.max-min)*scale+xy{x: 0, y: size.y}};
+	    let mut image = Image::zero(max-min);
+		let tile_size = {let (x,y) = tiff.chunk_dimensions(); xy{x,y}};
+		let tiles_stride = (size.x+tile_size.x-1) / tile_size.x;
+		let tiles = MinMax{min: min/tile_size, max: max/tile_size};
+		for y0 in tiles.min.y..tiles.max.y { for x0 in tiles.min.x..tiles.max.x {
+			let i = y0*tiles_stride+x0;
+			let tiff::decoder::DecodingResult::U8(data) = tiff.read_chunk(i)? else {unimplemented!()};
+			let tile = Image::new(tiff.chunk_data_dimensions(i).into(), bytemuck::cast_vec::<_, rgba8>(data));
+			for y in 0..tile.size.y { for x in 0..tile.size.x {
+				if let Some(p) = image.get_mut(xy{x: x0*tile_size.x+x, y: y0*tile_size.y+y}) { *p = {let rgba{r,g,b,a:_} = tile[xy{x,y}]; rgb{r,g,b}}; } // FIXME
+			}}
+		}}
+		std::fs::write(cache, bytemuck::cast_slice(&image.data))?;
+		println!("{cache}");
 	}
 	let image = map::<rgb8>(cache)?;
-	let image = image::Image::new(10000.into(), image);
+	let image = Image::new(10000.into(), image);
 	Ok(Self{
 		terrain: Terrain::new(context, commands, points, image.as_ref())?,
 		view_position: xy{x: 0., y: 0.}, yaw: 0.
@@ -101,7 +106,7 @@ fn paint(&mut self, context@Context{memory_allocator, ..}: &Context, commands: &
 	}
 	let view_projection = from_linear(view_projection);
 	
-	let depth = ImageView::new_default(Image::new(memory_allocator.clone(), ImageCreateInfo{
+	let depth = ImageView::new_default(GPUImage::new(memory_allocator.clone(), ImageCreateInfo{
 	format: Format::D16_UNORM,
 	extent: target.image().extent(),
 	usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT,
